@@ -65,6 +65,7 @@ class RecoveredFragment(BaseModel):
     raw_hex_preview: Optional[str] = None
     linked_fragment_ids: List[str] = []
     reconstructed_bytes: Optional[bytes] = None
+    gemini_verification: Optional[Dict[str, Any]] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -95,3 +96,5 @@ class ScanReport(BaseModel):
     relationships: List[RelationshipEdge]
     stats: Dict[str, Any]
     sector_map_summary: List[SectorInfo]
+    saved_folder: Optional[str] = None
+    gemini_report: Optional[Dict[str, Any]] = None

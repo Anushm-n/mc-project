@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.vscode/
+gemini_config.json
+corrupted_file_analysis_result.json
+recovered_files/
+recovered_storage/
+*.dd
+*.raw
+*.img

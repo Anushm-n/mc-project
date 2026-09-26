@@ -1,4 +1,5 @@
 import io
+import os
 import json
 import ast
 from typing import Tuple, List, Dict, Any, Optional
@@ -137,7 +138,28 @@ class IntegrityAssessor:
                 validation_pts = 12.0
                 factors.append("Source code contains partial functions/blocks; human readable (+12%)")
         elif category == FileCategory.DATABASE:
-            if b"SQLite format 3" in raw_bytes or raw_bytes.startswith(b"\x0D"):
+            db_ok = False
+            try:
+                import tempfile, sqlite3
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".sqlite") as tmp:
+                    tmp.write(raw_bytes)
+                    tmp_name = tmp.name
+                conn = sqlite3.connect(tmp_name)
+                cur = conn.cursor()
+                cur.execute("PRAGMA quick_check")
+                row = cur.fetchone()
+                if row and row[0] == "ok":
+                    db_ok = True
+                conn.close()
+                os.unlink(tmp_name)
+            except Exception:
+                db_ok = False
+
+            if db_ok:
+                validation_pts = 20.0
+                factors.append("SQLite database integrity check PRAGMA quick_check PASSED (+20%)")
+                score = max(score, 94.0)
+            elif b"SQLite format 3" in raw_bytes or raw_bytes.startswith(b"\x0D"):
                 validation_pts = 18.0
                 factors.append("Valid SQLite B-tree page signatures verified (+18%)")
             else:

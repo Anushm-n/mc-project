@@ -27,6 +27,12 @@ class FragmentReconstructor:
         notes = []
         repaired = bytearray(data)
 
+        # 0. Check if valid SOI is present at offset > 0 (strip leading corruption)
+        soi_pos = repaired.find(b"\xFF\xD8")
+        if soi_pos > 0:
+            repaired = bytearray(repaired[soi_pos:])
+            notes.append(f"Trimmed {soi_pos} bytes of corrupt lead-in prior to JPEG SOI marker.")
+
         # 1. Check for SOI (Start of Image)
         if not repaired.startswith(b"\xFF\xD8"):
             # Check if there is an embedded SOS marker (\xFF\xDA)
@@ -42,7 +48,10 @@ class FragmentReconstructor:
             notes.append("Valid JPEG Start-Of-Image marker detected.")
 
         # 2. Check for EOI (End of Image)
-        if not repaired.endswith(JPEG_EOI):
+        eoi_pos = repaired.rfind(JPEG_EOI)
+        if eoi_pos != -1:
+            repaired = bytearray(repaired[:eoi_pos + len(JPEG_EOI)])
+        else:
             repaired.extend(JPEG_EOI)
             notes.append("Synthesized and appended missing JPEG EOI (End-of-Image) marker.")
 
@@ -53,6 +62,12 @@ class FragmentReconstructor:
         notes = []
         png_sig = b"\x89PNG\r\n\x1a\n"
         repaired = bytearray(data)
+
+        # 0. Strip leading corruption if PNG signature is at offset > 0
+        sig_pos = repaired.find(png_sig)
+        if sig_pos > 0:
+            repaired = bytearray(repaired[sig_pos:])
+            notes.append(f"Trimmed {sig_pos} bytes of corrupt lead-in prior to PNG signature.")
 
         if not repaired.startswith(png_sig):
             repaired = bytearray(png_sig + repaired)
@@ -71,6 +86,12 @@ class FragmentReconstructor:
         """Reconstructs broken PDF trailer, xref table, and EOF marker."""
         notes = []
         repaired = bytearray(data)
+
+        # 0. Strip leading corruption if PDF header is at offset > 0
+        pdf_pos = repaired.find(b"%PDF-")
+        if pdf_pos > 0:
+            repaired = bytearray(repaired[pdf_pos:])
+            notes.append(f"Trimmed {pdf_pos} bytes of corrupt lead-in prior to %PDF- signature.")
 
         # 1. Check header
         if not repaired.startswith(b"%PDF-"):
@@ -95,8 +116,40 @@ class FragmentReconstructor:
         """Recovers SQLite B-tree leaf records from damaged database sectors even if page 0 is wiped."""
         notes = []
         records_found = []
-        
-        # SQLite B-tree leaf page flags: 0x0D (table leaf), 0x0A (index leaf)
+        sqlite_header_sig = b"SQLite format 3\x00"
+
+        # 1. If payload contains standard SQLite format 3 signature, test direct querying
+        if sqlite_header_sig in data:
+            sig_pos = data.find(sqlite_header_sig)
+            trimmed_data = data[sig_pos:]
+            try:
+                import tempfile, sqlite3, os
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".sqlite") as tmp:
+                    tmp.write(trimmed_data)
+                    tmp_name = tmp.name
+                conn = sqlite3.connect(tmp_name)
+                cur = conn.cursor()
+                cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                tables = [r[0] for r in cur.fetchall()]
+                for t in tables:
+                    cur.execute(f"SELECT * FROM {t} LIMIT 10")
+                    rows = cur.fetchall()
+                    for r_idx, r in enumerate(rows):
+                        records_found.append({
+                            "page_offset": sig_pos,
+                            "cell_index": r_idx,
+                            "extracted_fields": [str(item) for item in r]
+                        })
+                conn.close()
+                os.unlink(tmp_name)
+                if sig_pos > 0:
+                    notes.append(f"Trimmed {sig_pos} bytes of corrupt lead-in prior to SQLite header.")
+                notes.append(f"Direct SQLite table validation successful: {len(tables)} tables ({', '.join(tables)}), {len(records_found)} records parsed.")
+                return trimmed_data, notes, records_found
+            except Exception as e:
+                notes.append(f"Direct SQLite query attempt: {e}")
+
+        # 2. SQLite B-tree leaf page flags: 0x0D (table leaf), 0x0A (index leaf)
         # Scan data for B-tree leaf pages
         for offset in range(0, len(data), 512):
             chunk = data[offset:offset + 512]
@@ -128,9 +181,13 @@ class FragmentReconstructor:
                                         "extracted_fields": decoded_strings
                                     })
 
-        # Ensure standard SQLite 100-byte header if missing
+        # 3. Ensure standard SQLite 100-byte header if missing
         repaired = bytearray(data)
-        sqlite_header_sig = b"SQLite format 3\x00"
+        sig_pos = repaired.find(sqlite_header_sig)
+        if sig_pos > 0:
+            repaired = bytearray(repaired[sig_pos:])
+            notes.append(f"Trimmed {sig_pos} bytes of corrupt lead-in prior to SQLite header.")
+
         if not repaired.startswith(sqlite_header_sig):
             # Create synthetic 100-byte header (4096 page size)
             synthetic_header = bytearray(100)
@@ -139,6 +196,8 @@ class FragmentReconstructor:
             synthetic_header[18] = 1 # write version
             synthetic_header[19] = 1 # read version
             repaired = synthetic_header + repaired
+            if len(repaired) % 4096 != 0:
+                repaired += b"\x00" * (4096 - (len(repaired) % 4096))
             notes.append("Synthesized 100-byte SQLite v3 database file header.")
 
         return bytes(repaired), notes, records_found

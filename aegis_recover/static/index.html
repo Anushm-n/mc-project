@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AegisRecover AI | Forensics & Data Recovery Workbench</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=2.2">
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <header class="app-header">
+        <div class="brand">
+            <div class="brand-logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="M9 12l2 2 4-4"/>
+                </svg>
+            </div>
+            <div>
+                <h1>AEGIS<span class="highlight">RECOVER</span> <span class="badge-ai">AI FORENSICS</span></h1>
+                <p class="subtitle">Autonomous Deep Sector Carving, Reconstruction & Fragment Relationship Engine</p>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <!-- Damage Profile Selector -->
+            <select id="select-profile" class="select-dropdown" title="Select Simulation Profile">
+                <option value="MIXED_FORENSIC">Profile: Mixed Forensics</option>
+                <option value="RANSOMWARE_WIPE">Profile: Ransomware Wipe</option>
+                <option value="HEAD_CRASH">Profile: Hardware Head Crash</option>
+            </select>
+
+            <button id="btn-simulate" class="btn btn-primary">
+                <span class="icon">⚡</span> Run Simulation
+            </button>
+            <label for="file-upload" class="btn btn-secondary" title="Upload damaged files or disk images (.dd, .raw, .jpg, .pdf, any file) to carve, repair, and save">
+                <span class="icon">📁</span> Upload Files / Drive
+            </label>
+            <input type="file" id="file-upload" style="display:none;" />
+            <button id="btn-gemini-config" class="btn btn-gemini-badge" title="Google Gemini AI Model Status & Verification">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color: #c084fc;">
+                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+                </svg>
+                <span id="nav-gemini-status">Gemini AI Active</span>
+            </button>
+            <button id="btn-download-all-zip" class="btn btn-emerald" disabled title="Download all recovered files as ZIP bundle">
+                <span class="icon">📦</span> Download All (.ZIP)
+            </button>
+            <button id="btn-dossier" class="btn btn-outline" disabled title="View Official Forensic Examination Report">
+                <span class="icon">🖨️</span> Forensic Dossier
+            </button>
+        </div>
+    </header>
+
+    <main class="dashboard-grid">
+        <!-- Storage Damage vs Recovery Accounting HUD -->
+        <section class="panel storage-accounting-panel">
+            <div class="accounting-header">
+                <div>
+                    <span class="sublabel">STORAGE HEALTH & RECOVERY ACCOUNTING LEDGER</span>
+                    <h3 id="accounting-title">No Storage Loaded - Upload a File or Run Simulation</h3>
+                </div>
+                <div class="accounting-metrics">
+                    <div class="acc-metric">
+                        <span class="acc-label">INPUT SIZE</span>
+                        <span id="metric-total-size" class="acc-val text-cyan">0 B</span>
+                    </div>
+                    <div class="acc-metric">
+                        <span class="acc-label">SALVAGED RECOVERY</span>
+                        <span id="metric-recovered-size" class="acc-val text-emerald">0 B (0%)</span>
+                    </div>
+                    <div class="acc-metric">
+                        <span class="acc-label">DAMAGED / LOST</span>
+                        <span id="metric-damaged-size" class="acc-val text-red">0 B (0%)</span>
+                    </div>
+                    <div class="acc-metric">
+                        <span class="acc-label">ZERO SLACK</span>
+                        <span id="metric-slack-size" class="acc-val text-muted">0 B</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visual Storage Distribution Bar -->
+            <div class="storage-bar-wrapper">
+                <div id="bar-recovered" class="bar-segment seg-recovered" style="width: 0%;" title="Recovered Data"></div>
+                <div id="bar-damaged" class="bar-segment seg-damaged" style="width: 0%;" title="Damaged Data"></div>
+                <div id="bar-slack" class="bar-segment seg-slack" style="width: 100%;" title="Zero Slack Space"></div>
+            </div>
+            <div class="bar-legend">
+                <span><span class="dot bg-emerald"></span> Salvaged Recovered Data (<b id="lbl-rec-pct">0%</b>)</span>
+                <span><span class="dot bg-red"></span> Damaged / Corrupted Sectors (<b id="lbl-dmg-pct">0%</b>)</span>
+                <span><span class="dot bg-slate"></span> Unallocated Slack (<b id="lbl-slk-pct">100%</b>)</span>
+            </div>
+        </section>
+
+        <!-- HUD Metrics Section -->
+        <section class="hud-stats-card">
+            <div class="stat-box">
+                <span class="stat-label">SCAN ID</span>
+                <span id="stat-scan-id" class="stat-value text-cyan">SCAN_READY</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">TOTAL SECTORS</span>
+                <span id="stat-sectors" class="stat-value">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">SALVAGED ARTIFACTS</span>
+                <span id="stat-fragments" class="stat-value text-emerald">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">AVG FIDELITY</span>
+                <span id="stat-recoverability" class="stat-value text-amber">0.0%</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">CRITICAL FORENSIC INTEL</span>
+                <span id="stat-critical" class="stat-value text-red">0</span>
+            </div>
+        </section>
+
+        <!-- Sector Entropy Map & Carving Boundaries Visualizer -->
+        <section class="panel sector-map-panel">
+            <div class="panel-header" style="flex-wrap: wrap; gap: 12px;">
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <h2>STORAGE SECTOR ENTROPY MAP & CARVING BOUNDARIES</h2>
+                    <div id="sector-buffering-indicator" class="sector-buffering-badge idle" title="Live Sector Buffer Status">
+                        <span class="buffering-spinner-icon">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                            </svg>
+                        </span>
+                        <span id="sector-buffer-status-text">BUFFER READY</span>
+                    </div>
+                </div>
+
+                <div style="display:flex; align-items:center; gap:14px; margin-left:auto; flex-wrap:wrap;">
+                    <div class="view-toggle-group">
+                        <button id="btn-toggle-graph" class="btn-toggle active" title="Forensic Waveform Graph View">
+                            📈 Graph View
+                        </button>
+                        <button id="btn-toggle-grid" class="btn-toggle" title="Classic Sector Grid View">
+                            ▦ Grid View
+                        </button>
+                    </div>
+
+                    <div class="sector-legend">
+                        <span class="legend-item"><span class="box bg-zero"></span> Zero Slack (H≈0)</span>
+                        <span class="legend-item"><span class="box bg-code"></span> Code / Text (H:3-5)</span>
+                        <span class="legend-item"><span class="box bg-db"></span> Database (H:5-6.5)</span>
+                        <span class="legend-item"><span class="box bg-media"></span> Media / High (H>6.5)</span>
+                        <span class="legend-item"><span class="box bg-carved-boundary"></span> Carved Boundary</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Waveform Graph Container (Default Active) -->
+            <div id="sector-graph-wrapper" class="sector-graph-wrapper">
+                <canvas id="sector-entropy-canvas" height="230"></canvas>
+                <div id="sector-graph-tooltip" class="sector-graph-tooltip" style="display:none;"></div>
+                <div id="sector-scan-laser" class="sector-scan-laser" style="display:none;"></div>
+                <div id="sector-empty-hint" class="empty-hint" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); pointer-events:none;">
+                    Execute a simulation or upload a file to generate the forensic entropy waveform and carving boundaries.
+                </div>
+            </div>
+
+            <!-- Classic Sector Grid Container (Toggleable) -->
+            <div id="sector-grid" class="sector-grid-container" style="display:none;">
+                <div class="empty-hint">Execute a scan or benchmark to generate the sector entropy heat grid.</div>
+            </div>
+        </section>
+
+        <!-- Multi-Fragment Stitching Action Bar -->
+        <div id="stitch-toolbar" class="stitch-banner" style="display:none;">
+            <div class="stitch-info">
+                <span class="stitch-badge">CHAIN STITCHING</span>
+                <span id="stitch-count-text">2 fragments selected for reconstruction</span>
+            </div>
+            <button id="btn-stitch-fragments" class="btn btn-sm btn-stitch">
+                🔗 Stitch & Rebuild File Chain
+            </button>
+        </div>
+
+        <!-- Upload & Carving Error / Warning Banner -->
+        <div id="upload-error-banner" class="upload-error-banner" style="display:none; margin-bottom: 20px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(185, 28, 28, 0.12)); border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 10px; padding: 16px 20px; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; box-shadow: 0 4px 20px rgba(239, 68, 68, 0.2);">
+            <div style="display:flex; align-items:center; gap:14px;">
+                <div style="font-size: 2rem;">⚠️</div>
+                <div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span id="upload-error-title" style="font-weight: 700; font-size: 1.05rem; color: #fca5a5;">Upload Notice</span>
+                        <span style="background: #ef4444; color: #fff; font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">SCAN NOTICE</span>
+                    </div>
+                    <div id="upload-error-message" style="margin-top: 4px; font-size: 0.88rem; color: #fecaca;">
+                        Error details
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <label for="file-upload" class="btn btn-sm btn-outline" style="cursor:pointer; border-color:#f87171; color:#fca5a5;">
+                    📂 Choose Another File
+                </label>
+                <button id="btn-close-error-banner" class="btn btn-sm btn-secondary" style="color:#94a3b8; padding: 4px 10px;">
+                    ✕ Dismiss
+                </button>
+            </div>
+        </div>
+
+        <!-- Live Recovered Files Success Banner -->
+        <div id="recovery-alert-banner" class="recovery-success-banner" style="display:none; margin-bottom: 20px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(2, 132, 199, 0.15)); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 10px; padding: 16px 20px; display: none; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+            <div style="display:flex; align-items:center; gap:14px;">
+                <div style="font-size: 2rem;">✅</div>
+                <div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span id="alert-file-title" style="font-weight: 700; font-size: 1.1rem; color: #f8fafc;">File Successfully Recovered & Saved!</span>
+                        <span style="background: #10b981; color: #07090e; font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">SAVED TO DISK</span>
+                    </div>
+                    <div style="margin-top: 4px; font-size: 0.85rem; color: #94a3b8;">
+                        Saved on your PC: <code id="alert-target-path" style="color: #38bdf8; font-family: monospace; background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px;">C:\Users\...</code>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <a id="btn-alert-download" href="#" class="btn btn-emerald" style="text-decoration:none; font-weight:700;">
+                    ⬇️ Download File
+                </a>
+                <button id="btn-alert-copy-path" class="btn btn-outline" style="border-color:#38bdf8; color:#38bdf8;">
+                    📋 Copy Path
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Workbench: Two Columns -->
+        <div class="workbench-layout">
+            <!-- Left: Recovered Files Explorer -->
+            <section class="panel fragment-list-panel">
+                <div class="panel-header" style="flex-wrap:wrap; gap:10px;">
+                    <h2>📁 RECOVERED FILES & ARTIFACTS (<span id="frag-count">0</span>)</h2>
+                    <input type="text" id="frag-search" class="search-input" placeholder="🔍 Search recovered files, code, entities..." />
+                    <div class="filter-bar">
+                        <button class="filter-btn active" data-filter="ALL">All Files</button>
+                        <button class="filter-btn" data-filter="CRITICAL">Critical</button>
+                        <button class="filter-btn" data-filter="SOURCE_CODE">Code</button>
+                        <button class="filter-btn" data-filter="DATABASE">Database</button>
+                        <button class="filter-btn" data-filter="IMAGE">Images</button>
+                    </div>
+                </div>
+                <div id="fragment-list" class="fragment-scroll-container">
+                    <div class="empty-hint">No recovered files yet. Upload a file above to recover it.</div>
+                </div>
+            </section>
+
+            <!-- Right: Deep Forensic Inspector -->
+            <section class="panel inspector-panel">
+                <div class="panel-header">
+                    <h2>🔍 RECOVERED FILE INSPECTOR & CODE PREVIEW</h2>
+                    <div id="inspector-actions" style="display:none; gap:8px;">
+                        <button id="btn-download-frag" class="btn btn-sm btn-emerald">⬇️ Download File</button>
+                    </div>
+                </div>
+
+                <div id="inspector-content" class="inspector-body">
+                    <div class="empty-hint">Select any salvaged fragment from the list or sector grid to inspect raw payload, AI prognosis, and extracted entities.</div>
+                </div>
+            </section>
+        </div>
+
+        <section id="document-reconstruction-panel" class="panel reconstruction-panel" style="display:none;">
+            <div class="panel-header">
+                <h2>FULL DOCUMENT RECONSTRUCTION & RECOVERY VIEW</h2>
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <button id="btn-download-reconstruction" class="btn btn-sm btn-emerald" disabled>⬇️ Download Reconstructed File</button>
+                    <button id="btn-export-pdf" class="btn btn-sm btn-outline" disabled>📄 Export PDF</button>
+                </div>
+            </div>
+            <div id="document-reconstruction-summary" class="reconstruction-summary"></div>
+            <pre id="document-reconstruction-output" class="document-output">No reconstructed document available yet.</pre>
+        </section>
+    </main>
+
+    <!-- Post-Scan User Report Modal -->
+    <div id="report-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-badge">RECOVERY ANALYSIS REPORT</div>
+                <button id="btn-close-modal" class="btn-close">&times;</button>
+            </div>
+            <h2 id="modal-scan-title">Storage Drive Recovery Complete</h2>
+            <p id="modal-verdict" class="modal-verdict">Executive Summary</p>
+
+            <div class="modal-stats-grid">
+                <div class="mstat-box">
+                    <span class="mlabel">TOTAL INPUT</span>
+                    <span id="mstat-input" class="mval">0 B</span>
+                </div>
+                <div class="mstat-box">
+                    <span class="mlabel">SALVAGED DATA</span>
+                    <span id="mstat-recovered" class="mval text-emerald">0 B</span>
+                </div>
+                <div class="mstat-box">
+                    <span class="mlabel">DAMAGED SECTORS</span>
+                    <span id="mstat-damaged" class="mval text-red">0 B</span>
+                </div>
+                <div class="mstat-box">
+                    <span class="mlabel">ARTIFACTS SALVAGED</span>
+                    <span id="mstat-count" class="mval text-cyan">0 Files</span>
+                </div>
+            </div>
+
+            <div class="modal-intel-section">
+                <h4>HIGH-VALUE FORENSIC INTEL DISCOVERED:</h4>
+                <div id="modal-intel-list" class="intel-tags-container">
+                    <span class="intel-tag">Scanning...</span>
+                </div>
+            </div>
+
+            <div class="modal-folder-section" style="margin-top: 14px; background: rgba(15, 23, 42, 0.6); padding: 12px 16px; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.25);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.05em;">
+                        📂 SAVED TO LOCAL HARD DRIVE
+                    </span>
+                    <span style="font-size: 0.72rem; color: #10b981; font-weight: 600;">● PERSISTED ON DISK</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div id="modal-folder-path" style="flex:1; font-family: monospace; font-size: 0.85rem; color: #38bdf8; word-break: break-all; background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 4px;">
+                        C:\Users\laksh\...
+                    </div>
+                    <button id="btn-modal-copy-path" class="btn btn-sm btn-outline" style="border-color:#38bdf8; color:#38bdf8; white-space:nowrap;">
+                        📋 Copy Path
+                    </button>
+                </div>
+                <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">
+                    Both your original uploaded file and all salvaged/repaired files are saved in this folder.
+                </div>
+            </div>
+
+            <section id="modal-document-reconstruction" class="modal-reconstruction">
+                <div class="modal-reconstruction-header">
+                    <h3>FULL DOCUMENT RECONSTRUCTION</h3>
+                    <div class="modal-reconstruction-actions">
+                        <button id="btn-modal-download-reconstruction" class="btn btn-sm btn-emerald" disabled>Download Reconstructed File</button>
+                        <button id="btn-modal-export-pdf" class="btn btn-sm btn-outline" disabled>Export PDF</button>
+                    </div>
+                </div>
+                <div id="modal-reconstruction-status" class="modal-reconstruction-status" aria-live="polite">Loading recovered document content...</div>
+                <pre id="modal-reconstruction-content" class="document-output modal-document-output"></pre>
+            </section>
+
+            <div class="modal-actions" style="margin-top: 20px; flex-wrap:wrap;">
+                <a id="btn-modal-direct-download" href="#" class="btn btn-emerald" style="display:none; text-decoration:none; font-weight:700;">
+                    ⬇️ Download File
+                </a>
+                <button id="btn-modal-zip" class="btn btn-secondary">
+                    <span class="icon">📦</span> Download All (.ZIP)
+                </button>
+                <button id="btn-modal-dossier" class="btn btn-outline">
+                    <span class="icon">🖨️</span> Forensic Dossier
+                </button>
+                <button id="btn-modal-dismiss" class="btn btn-outline">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gemini API Key & Model Configuration Modal -->
+    <div id="gemini-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-card" style="max-width:550px;">
+            <div class="modal-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="font-size:2rem;">🤖</div>
+                    <div>
+                        <h2 style="margin:0; font-size:1.25rem; color:#f8fafc;">Google Gemini Forensic AI</h2>
+                        <span style="font-size:0.8rem; color:#c084fc; font-weight:600;">Deep Neural Structural Verification & Code Analysis</span>
+                    </div>
+                </div>
+                <button id="btn-close-gemini-modal" class="btn btn-outline" style="padding:4px 10px; cursor:pointer;">✕</button>
+            </div>
+            <div style="margin-top:16px;">
+                <p style="color:#94a3b8; font-size:0.88rem; line-height:1.5;">
+                    Every uploaded file is automatically inspected by Google Gemini models to verify syntax integrity, extract critical identifiers, confirm code completeness, and authenticate data before local hard drive storage.
+                </p>
+                <div style="margin-top:14px; background:rgba(0,0,0,0.35); border:1px solid rgba(168,85,247,0.3); border-radius:8px; padding:12px 16px;">
+                    <div style="font-size:0.85rem; color:#cbd5e1; margin-bottom:6px;">
+                        <b>Active AI Engine:</b> <span id="gemini-active-engine" style="color:#38bdf8; font-weight:700;">Loading...</span>
+                    </div>
+                    <div style="font-size:0.85rem; color:#94a3b8;">
+                        <b>Cloud Key Status:</b> <span id="gemini-active-key" style="color:#10b981; font-weight:700;">Checking...</span>
+                    </div>
+                </div>
+                <div style="margin-top:18px;">
+                    <label style="display:block; font-size:0.85rem; color:#cbd5e1; margin-bottom:6px; font-weight:600;">
+                        Optional: Set Google Gemini API Key (for Live Google Cloud Reasoning)
+                    </label>
+                    <input type="password" id="input-gemini-key" class="search-input" placeholder="Enter GEMINI_API_KEY (e.g. AIzaSy...)" style="width:100%; box-sizing:border-box; padding:10px 12px;" />
+                    <div style="font-size:0.75rem; color:#64748b; margin-top:4px;">
+                        Leave blank to use the built-in Gemini Neural Forensic Engine.
+                    </div>
+                </div>
+                <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
+                    <button id="btn-save-gemini-key" class="btn btn-primary" style="background: linear-gradient(135deg, #a855f7, #6366f1); font-weight:700;">
+                        Save & Apply AI Key
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="app-footer">
+        <div>AegisRecover AI &bull; Deep Data Recovery & Forensic Intelligence &bull; Python Backend Engine</div>
+        <div class="system-tag">API: <span id="api-status" class="online">ONLINE</span></div>
+    </footer>
+
+    <script src="/static/app.js?v=2.4"></script>
+</body>
+</html>
